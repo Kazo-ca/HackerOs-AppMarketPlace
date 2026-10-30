@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="HackerOs.MarketPlace.Tool/HackerOs.MarketPlace.Tool.csproj" />
+  <Project Path="HackerOs.MarketPlace.Tool.Tests/HackerOs.MarketPlace.Tool.Tests.csproj" />
+</Solution>

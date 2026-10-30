@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Catalog tool of the Hack Store (ADR 0188 §4 to §6 of Kazo-ca/HackerOs): checks an app folder,
+    checks the package our CI built from it, writes the review comment, and publishes the
+    packages branch. It reads manifests and packages with the HackerOS libraries themselves, so
+    the rules are exactly the ones the OS applies at install time.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <RootNamespace>HackerOs.MarketPlace</RootNamespace>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <!-- The HackerOs repository, a submodule pinned to a commit of its main branch. -->
+    <HackerOsRoot>$(MSBuildThisFileDirectory)../../external/HackerOs/wasm2/HackerOs/</HackerOsRoot>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      The package reader (AppPackage, ADR 0182) is not in the 2.1.0 NuGet packages yet: the tool
+      builds the two libraries from the submodule. Once a release carries it, these become
+      PackageReference items of that version and the submodule goes.
+    -->
+    <ProjectReference Include="$(HackerOsRoot)Shared/HackerOs.App.Abstractions/HackerOs.App.Abstractions.csproj" />
+    <ProjectReference Include="$(HackerOsRoot)Platform/HackerOs.Platform.Core/HackerOs.Platform.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="HackerOs.MarketPlace.Tool.Tests" />
+  </ItemGroup>
+
+</Project>

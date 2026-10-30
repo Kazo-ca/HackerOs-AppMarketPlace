@@ -1,0 +1,134 @@
+# Checks a pull request to the catalog (ADR 0188 §5). The jobs that build the app run its code, so
+# this workflow has a read-only token and no secret; pr-comment.yml posts the review comment from
+# the trusted main branch once this run is done.
+name: Validate app submissions
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  tool:
+    name: Catalog tool tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+      - run: dotnet test tools/HackerOs.MarketPlace.slnx -c Release
+
+  plan:
+    name: Check folders
+    runs-on: ubuntu-latest
+    outputs:
+      folders: ${{ steps.changes.outputs.folders }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          submodules: true
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Find the app folders this PR adds
+        id: changes
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          # A published version never changes: a fix is a new version folder.
+          changed=$(git diff --name-status --no-renames "$BASE"...HEAD -- apps)
+          refused=$(printf '%s\n' "$changed" | awk '$1 != "A" && split($2, p, "/") >= 3 {print $2}')
+          if [ -n "$refused" ]; then
+            printf '::error file=%s::Files of a merged version folder may not change or be deleted; add a new version folder instead.\n' $refused
+            exit 1
+          fi
+          folders=$(printf '%s\n' "$changed" | awk '$1 == "A" {split($2, p, "/"); if (p[3] != "") print p[2]}' | sort -u | sed '/^$/d' | jq -R . | jq -sc .)
+          echo "folders=$folders" >> "$GITHUB_OUTPUT"
+          echo "Added folders: $folders"
+
+      - name: Check the format of every folder and categories.json
+        run: dotnet run --project tools/HackerOs.MarketPlace.Tool -c Release -- validate --root .
+
+  build:
+    name: Build ${{ matrix.folder }}
+    needs: plan
+    if: needs.plan.outputs.folders != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        folder: ${{ fromJson(needs.plan.outputs.folders) }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Build and analyze
+        uses: ./.github/actions/build-app
+        with:
+          folder: ${{ matrix.folder }}
+          output: ${{ runner.temp }}/review/${{ matrix.folder }}/package
+          codeql: 'true'
+          sarif: ${{ runner.temp }}/review/${{ matrix.folder }}/sarif
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: build-${{ matrix.folder }}
+          path: ${{ runner.temp }}/review/${{ matrix.folder }}
+          if-no-files-found: ignore
+          retention-days: 7
+
+  review:
+    name: Check packages and write the review
+    needs: [plan, build]
+    if: always() && needs.plan.result == 'success' && needs.plan.outputs.folders != '[]'
+    runs-on: ubuntu-latest
+    steps:
+      # A fresh job: the tool is built here, away from the jobs that ran the app's code.
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: build-*
+          path: ${{ runner.temp }}/review
+
+      - name: Check each package against its folder
+        env:
+          FOLDERS: ${{ needs.plan.outputs.folders }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REVIEW: ${{ runner.temp }}/review
+        run: |
+          dotnet build tools/HackerOs.MarketPlace.Tool -c Release -nologo -v quiet
+          tool=(dotnet tools/HackerOs.MarketPlace.Tool/bin/Release/net10.0/HackerOs.MarketPlace.Tool.dll)
+          mkdir -p comment
+          echo "$PR_NUMBER" > comment/pr-number
+          {
+            echo '<!-- hackeros-catalog-review -->'
+            echo '## Hack Store review'
+            echo
+            echo 'Built by our CI from the commit each `store.json` names. A maintainer reads the code, then approves.'
+            echo
+          } > comment/comment.md
+          status=0
+          for folder in $(jq -r '.[]' <<< "$FOLDERS"); do
+            package=$(find "$REVIEW/build-$folder/package" -name '*.hackapp' -print -quit 2>/dev/null || true)
+            "${tool[@]}" check-package --root . --folder "$folder" --report "comment/$folder.md" \
+              ${package:+--package "$package"} --sarif "$REVIEW/build-$folder/sarif" || status=1
+            cat "comment/$folder.md" >> comment/comment.md
+          done
+          cat comment/comment.md >> "$GITHUB_STEP_SUMMARY"
+          exit $status
+
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: pr-comment
+          path: comment
+          retention-days: 7

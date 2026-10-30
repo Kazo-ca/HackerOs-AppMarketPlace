@@ -1,0 +1,3 @@
+# Every change is approved by the maintainer (ADR 0188 §5). Turn on "Require review from Code
+# Owners" in the protection of main for this file to block a merge without that approval.
+* @werddomain
