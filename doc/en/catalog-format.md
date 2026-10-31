@@ -83,7 +83,7 @@ The numbers are those of ADR 0188 §5.
 | 1, 2 | job *Check folders* | `validate` on `categories.json` and every folder |
 | 3 | job *Build* | `git fetch` of the commit from the `store.json` repository; fails if it does not exist |
 | 4 | job *Build* then *review* | `dotnet build -c Release -t:HackerOsPack`, then `check-package`: the package must be read by `AppPackage.Read` and its manifest must be the folder's |
-| 5 | — | API check against the trimmed runtime: done by `hackpkg` at install time (ADR 0182); not in CI yet (question asked to Benoit) |
+| 5 | — | API check against the trimmed runtime: done by `hackpkg` at install time (ADR 0182); not in CI for v1 (Benoit's decision, Q1 = A; [#3](https://github.com/Kazo-ca/HackerOs-AppMarketPlace/issues/3)) |
 | 6 | job *Build* | CodeQL (`csharp`, plus `javascript-typescript` when the repository has JS or TS files); results are summed up in the comment |
 | 7 | *review* then `pr-comment.yml` | comment: source, license, SDK, package size and SHA-256, capabilities (dangerous first, marked ⚠️), JavaScript files, assemblies, CodeQL results |
 
@@ -189,13 +189,13 @@ Actions, errors become annotations on the PR's files. Clone with `--recurse-subm
 ## Decisions taken in this work item
 
 - `store.json` gets two optional fields: `project` (the `.csproj` to build) and `kind` (only `app`
-  for now). Question Q2 asked to Benoit; recommendation applied.
+  for now). Benoit's decision (Q2 = A).
 - Limits the ADR did not set: long description 20 KB, screenshots 1 MB and 3840 px per side,
   10 tags.
 - `catalog.json` also holds the categories and their labels, so the Store reads a single file.
 - A merged version is immutable: a PR may only add folders.
-- The API check in CI (ADR 0188 §5 step 5) waits for Benoit's answer (Q1); recommendation: leave
-  it to install time for v1.
+- The API check in CI (ADR 0188 §5 step 5) is left to install time for v1 (Benoit's decision,
+  Q1 = A); it comes with [#3](https://github.com/Kazo-ca/HackerOs-AppMarketPlace/issues/3).
 
 ## Tasks
 
@@ -203,6 +203,6 @@ Actions, errors become annotations on the PR's files. Clone with `--recurse-subm
 - [x] Catalog tool: format, manifest, package, review comment, publication, tests.
 - [x] `validate.yml`, `pr-comment.yml`, `publish.yml` and the `build-app` action.
 - [x] README (English, French) and this document.
-- [ ] API check against the trimmed runtime in CI (depending on the answer to Q1).
+- [ ] API check against the trimmed runtime in CI ([#3](https://github.com/Kazo-ca/HackerOs-AppMarketPlace/issues/3)).
 - [ ] Replace the submodule by the NuGet packages once a release carries them.
 - [ ] Theme packs (`kind: "theme-pack"`, ADR 0190).

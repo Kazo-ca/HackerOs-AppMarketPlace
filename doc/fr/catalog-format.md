@@ -83,7 +83,7 @@ Les numéros sont ceux de l'ADR 0188 §5.
 | 1, 2 | job *Check folders* | `validate` sur `categories.json` et tous les dossiers |
 | 3 | job *Build* | `git fetch` du commit dans le dépôt de `store.json` ; échec s'il n'existe pas |
 | 4 | job *Build* puis *review* | `dotnet build -c Release -t:HackerOsPack`, puis `check-package` : le paquet doit être lu par `AppPackage.Read` et son manifeste être celui du dossier |
-| 5 | — | vérification des API contre le runtime élagué : faite par `hackpkg` à l'installation (ADR 0182) ; pas encore en CI (question posée à Benoit) |
+| 5 | — | vérification des API contre le runtime élagué : faite par `hackpkg` à l'installation (ADR 0182) ; pas en CI pour la v1 (décision de Benoit, Q1 = A ; [#3](https://github.com/Kazo-ca/HackerOs-AppMarketPlace/issues/3)) |
 | 6 | job *Build* | CodeQL (`csharp`, plus `javascript-typescript` si le dépôt a des fichiers JS ou TS) ; les résultats sont résumés dans le commentaire |
 | 7 | *review* puis `pr-comment.yml` | commentaire : source, licence, SDK, taille et SHA-256 du paquet, capacités (les dangereuses d'abord, marquées ⚠️), fichiers JavaScript, assemblies, résultats CodeQL |
 
@@ -193,14 +193,14 @@ GitHub Actions, les erreurs deviennent des annotations sur les fichiers de la PR
 ## Décisions prises dans ce chantier
 
 - `store.json` reçoit deux champs facultatifs : `project` (le `.csproj` à compiler) et `kind`
-  (`app` seulement pour l'instant). Question Q2 posée à Benoit ; recommandation appliquée.
+  (`app` seulement pour l'instant). Décision de Benoit (Q2 = A).
 - Limites que l'ADR ne fixait pas : description longue 20 Ko, captures 1 Mo et 3840 px de côté,
   10 étiquettes.
 - `catalog.json` contient aussi les catégories et leurs libellés, pour que le Store n'ait qu'un
   fichier à lire.
 - Une version fusionnée est immuable : une PR ne peut qu'ajouter des dossiers.
-- La vérification des API en CI (ADR 0188 §5 étape 5) attend la réponse de Benoit (Q1) ;
-  recommandation : la laisser à l'installation pour la v1.
+- La vérification des API en CI (ADR 0188 §5 étape 5) est laissée à l'installation pour la v1
+  (décision de Benoit, Q1 = A) ; elle viendra avec [#3](https://github.com/Kazo-ca/HackerOs-AppMarketPlace/issues/3).
 
 ## Tâches
 
@@ -208,6 +208,6 @@ GitHub Actions, les erreurs deviennent des annotations sur les fichiers de la PR
 - [x] Outil du catalogue : format, manifeste, paquet, commentaire de revue, publication, tests.
 - [x] `validate.yml`, `pr-comment.yml`, `publish.yml` et l'action `build-app`.
 - [x] README (anglais, français) et ce document.
-- [ ] Vérification des API contre le runtime élagué en CI (selon la réponse à Q1).
+- [ ] Vérification des API contre le runtime élagué en CI ([#3](https://github.com/Kazo-ca/HackerOs-AppMarketPlace/issues/3)).
 - [ ] Remplacer le sous-module par les paquets NuGet quand une version les contient.
 - [ ] Packs de thèmes (`kind: "theme-pack"`, ADR 0190).
