@@ -11,7 +11,11 @@ namespace HackerOs.MarketPlace;
 /// <item><c>check-package --root &lt;catalog&gt; --folder &lt;name&gt; --report &lt;file.md&gt; [--package &lt;file.hackapp&gt;] [--sarif &lt;dir&gt;]</c>:
 /// checks the package built from a folder and writes its review comment section.</item>
 /// <item><c>publish --root &lt;catalog&gt; --built &lt;dir&gt; --output &lt;packages branch&gt; [--keep 3] [--published-at &lt;ISO 8601&gt;]</c>:
-/// updates the <c>packages</c> branch.</item>
+/// updates the <c>packages</c> branch, signing each new package with the key of the
+/// <c>HACK_STORE_SIGNING_KEY</c> variable when it is set (ADR 0214 §2 of Kazo-ca/HackerOs).</item>
+/// <item><c>keygen --private-key &lt;file.pem&gt;</c>: creates the catalog's key pair, writes the private
+/// key to a new file and prints the public key to compile into the OS.</item>
+/// <item><c>sign --package &lt;file.hackapp&gt; [--private-key &lt;file.pem&gt;]</c>: prints the signature of a package.</item>
 /// </list>
 /// Exit code 0 on success, 1 when anything is refused, 2 on a usage error.
 /// </summary>
@@ -29,6 +33,8 @@ public static class Program
                 "validate" => Validate(CommandLine.Parse(args.AsSpan(1))),
                 "check-package" => CheckPackage(CommandLine.Parse(args.AsSpan(1))),
                 "publish" => Publish(CommandLine.Parse(args.AsSpan(1))),
+                "keygen" => KeyGen(CommandLine.Parse(args.AsSpan(1))),
+                "sign" => Sign(CommandLine.Parse(args.AsSpan(1))),
                 _ => Usage(),
             };
         }
@@ -106,9 +112,59 @@ public static class Program
             ? DateTimeOffset.Parse(at, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal)
             : DateTimeOffset.UtcNow;
         List<CatalogError> errors = [];
-        IReadOnlyList<string> published = CatalogPublisher.Publish(root, built, output, keep, DateTimeOffset.FromUnixTimeSeconds(publishedAt.ToUnixTimeSeconds()), errors);
-        return Report(errors, $"Published: {(published.Count == 0 ? "nothing" : string.Join(", ", published))}.");
+        string? signingKey = ReadSigningKey(null);
+        IReadOnlyList<string> published = CatalogPublisher.Publish(
+            root, built, output, keep, DateTimeOffset.FromUnixTimeSeconds(publishedAt.ToUnixTimeSeconds()), errors, signingKey);
+        string signed = signingKey is null ? " (unsigned: no signing key)" : $" (signed by {PackageSigner.GetPublicKey(signingKey)})";
+        return Report(errors, $"Published: {(published.Count == 0 ? "nothing" : string.Join(", ", published))}{signed}.");
     }
+
+    // The private key never goes through the command line: a file the maintainer keeps, or the secret.
+    private static int KeyGen(CommandLine line)
+    {
+        string path = Path.GetFullPath(line.Required("private-key"));
+        if (File.Exists(path))
+        {
+            Console.Error.WriteLine($"{path} already exists: keygen never replaces a key.");
+            return 1;
+        }
+
+        (string privateKey, string publicKey) = PackageSigner.CreateKeyPair();
+        using (FileStream file = new(path, FileMode.CreateNew, FileAccess.Write))
+        {
+            if (!OperatingSystem.IsWindows())
+            {
+                File.SetUnixFileMode(file.SafeFileHandle, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+            }
+
+            using StreamWriter writer = new(file);
+            writer.Write(privateKey);
+        }
+
+        Console.WriteLine($"Private key written to {path}: store it as the {PackageSigner.KeyVariable} secret of this repository, then keep it offline.");
+        Console.WriteLine("Public key (HackerOsAppSigningKeys, catalog:official=...):");
+        Console.WriteLine(publicKey);
+        return 0;
+    }
+
+    private static int Sign(CommandLine line)
+    {
+        byte[] package = File.ReadAllBytes(Path.GetFullPath(line.Required("package")));
+        string? key = ReadSigningKey(line.Optional("private-key"));
+        if (key is null)
+        {
+            Console.Error.WriteLine($"No signing key: pass --private-key <file.pem> or set {PackageSigner.KeyVariable}.");
+            return 1;
+        }
+
+        Console.WriteLine(PackageSigner.Sign(package, key));
+        return 0;
+    }
+
+    private static string? ReadSigningKey(string? path) =>
+        path is not null ? File.ReadAllText(Path.GetFullPath(path))
+        : Environment.GetEnvironmentVariable(PackageSigner.KeyVariable) is { Length: > 0 } pem ? pem
+        : null;
 
     private static int Report(IReadOnlyList<CatalogError> errors, string success)
     {
@@ -132,6 +188,8 @@ public static class Program
         Console.Error.WriteLine("  validate --root <catalog> [folder...]");
         Console.Error.WriteLine("  check-package --root <catalog> --folder <name> --report <file.md> [--package <file.hackapp>] [--sarif <dir>]");
         Console.Error.WriteLine("  publish --root <catalog> --built <dir> --output <packages branch> [--keep 3] [--published-at <ISO 8601>]");
+        Console.Error.WriteLine("  keygen --private-key <file.pem>");
+        Console.Error.WriteLine("  sign --package <file.hackapp> [--private-key <file.pem>]");
         return 2;
     }
 }

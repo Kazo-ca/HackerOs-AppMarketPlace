@@ -78,6 +78,10 @@ public sealed record CatalogApp(
 /// <param name="Icon">Path of the icon.</param>
 /// <param name="Screenshots">Paths of the screenshots, in order.</param>
 /// <param name="Descriptions">Path of the long description by language code.</param>
+/// <param name="Signature">
+/// ECDSA P-256 signature of the package, base64 (ADR 0214 §2 of Kazo-ca/HackerOs); absent when the
+/// catalog had no signing key at publication.
+/// </param>
 public sealed record CatalogVersion(
     string Version,
     string Commit,
@@ -89,7 +93,8 @@ public sealed record CatalogVersion(
     CatalogSdkRange SdkCompatibility,
     string Icon,
     IReadOnlyList<string> Screenshots,
-    IReadOnlyDictionary<string, string> Descriptions);
+    IReadOnlyDictionary<string, string> Descriptions,
+    string? Signature = null);
 
 /// <summary>SDK range of a version, as in its manifest.</summary>
 /// <param name="MinimumVersion">Lowest SDK version.</param>

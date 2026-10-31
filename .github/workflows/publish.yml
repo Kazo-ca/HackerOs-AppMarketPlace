@@ -1,5 +1,6 @@
 # Publishes after a merge (ADR 0188 §6): rebuilds each new version at its commit, then rewrites the
-# packages branch (catalog.json, packages/, assets/), keeping the 3 newest versions of each app.
+# packages branch (catalog.json, packages/, assets/), keeping the 3 newest versions of each app,
+# and signs each new package with the HACK_STORE_SIGNING_KEY secret when it is set.
 # The build jobs run the app's code with a read-only token; only the last job may push.
 name: Publish catalog
 
@@ -114,6 +115,9 @@ jobs:
       - name: Publish
         env:
           ARTIFACTS: ${{ runner.temp }}/artifacts
+          # ADR 0214 §2 of Kazo-ca/HackerOs: each new package is signed when the secret exists.
+          # The key stays in this environment variable; it is never written to disk or printed.
+          HACK_STORE_SIGNING_KEY: ${{ secrets.HACK_STORE_SIGNING_KEY }}
         run: |
           # download-artifact names each folder built-<folder>; the tool wants <folder>.
           mkdir -p "$RUNNER_TEMP/built"

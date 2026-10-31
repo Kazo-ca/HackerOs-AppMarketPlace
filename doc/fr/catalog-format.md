@@ -152,7 +152,8 @@ catalog** à la main avec les noms de dossiers séparés par des espaces.
           "sdkCompatibility": { "minimumVersion": "2.1.0" },
           "icon": "assets/org.example.notes/1.2.0/icon.png",
           "screenshots": ["assets/org.example.notes/1.2.0/screenshots/1.png"],
-          "descriptions": { "en": "assets/org.example.notes/1.2.0/description.en.md" }
+          "descriptions": { "en": "assets/org.example.notes/1.2.0/description.en.md" },
+          "signature": "MEUCIQ…"
         }
       ]
     }
@@ -167,6 +168,26 @@ catalog** à la main avec les noms de dossiers séparés par des espaces.
   par version, pour que le Store montre ce qu'une mise à jour ajoute.
 - `schemaVersion` change si le format change de façon incompatible ; un lecteur refuse une version
   plus grande que la sienne.
+- `signature` (facultatif) : signature ECDSA P-256 / SHA-256 des octets du `.hackapp`, au format
+  IEEE P1363 (`r||s`, 64 octets) en base64 ([ADR 0214](https://github.com/Kazo-ca/HackerOs/blob/main/doc/fr/wasm/dev/adr/0214-hack-store-hot-add-signing-transactions.md)
+  de HackerOs, §2). `publish.yml` signe chaque nouvelle version avec le secret
+  `HACK_STORE_SIGNING_KEY` quand il existe ; sans lui, les versions sont publiées sans signature.
+  Une version déjà publiée garde sa signature.
+
+### Clé de signature (à faire par Benoit)
+
+1. Sur ton ordinateur, dans une copie de ce dépôt :
+   `dotnet run --project tools/HackerOs.MarketPlace.Tool -- keygen --private-key ~/hack-store-signing.pem`.
+   L'outil écrit la clé privée dans un nouveau fichier (`0600`), ne remplace jamais un fichier
+   existant, et affiche la clé publique.
+2. Copier le contenu du fichier `.pem` dans le secret `HACK_STORE_SIGNING_KEY` du dépôt
+   (Settings ▸ Secrets and variables ▸ Actions), puis garder le fichier hors ligne. La clé
+   privée ne passe jamais par un agent ni par une PR.
+3. Mettre la clé publique dans `OfficialCatalogSigningKey` (`AppPackageDefaults.cs`) ou dans la
+   propriété MSBuild `HackerOsAppSigningKeys` de HackerOs (`catalog:official=<clé publique>`) :
+   dès cette version de l'OS, tout paquet du catalogue officiel doit porter une signature valide.
+4. Republier les versions existantes (workflow *Publish catalog* ▸ Run workflow, avec leurs
+   dossiers) pour qu'elles reçoivent une signature avant que l'OS l'exige.
 
 ## L'outil du catalogue
 
@@ -174,6 +195,8 @@ catalog** à la main avec les noms de dossiers séparés par des espaces.
 dotnet run --project tools/HackerOs.MarketPlace.Tool -- validate --root . [dossier...]
 dotnet run --project tools/HackerOs.MarketPlace.Tool -- check-package --root . --folder <dossier> --report <f.md> [--package <f.hackapp>] [--sarif <dossier>]
 dotnet run --project tools/HackerOs.MarketPlace.Tool -- publish --root . --built <dossier> --output <copie de packages> [--keep 3] [--published-at <ISO 8601>]
+dotnet run --project tools/HackerOs.MarketPlace.Tool -- keygen --private-key <fichier.pem>
+dotnet run --project tools/HackerOs.MarketPlace.Tool -- sign --package <f.hackapp> [--private-key <fichier.pem>]
 dotnet test tools/HackerOs.MarketPlace.slnx
 ```
 
