@@ -149,7 +149,8 @@ hand with the folder names separated by spaces.
           "sdkCompatibility": { "minimumVersion": "2.1.0" },
           "icon": "assets/org.example.notes/1.2.0/icon.png",
           "screenshots": ["assets/org.example.notes/1.2.0/screenshots/1.png"],
-          "descriptions": { "en": "assets/org.example.notes/1.2.0/description.en.md" }
+          "descriptions": { "en": "assets/org.example.notes/1.2.0/description.en.md" },
+          "signature": "MEUCIQ…"
         }
       ]
     }
@@ -164,6 +165,26 @@ hand with the folder names separated by spaces.
   can show what an update adds.
 - `schemaVersion` changes when the format changes incompatibly; a reader refuses a higher version
   than its own.
+- `signature` (optional): ECDSA P-256 / SHA-256 signature of the `.hackapp` bytes, in IEEE P1363
+  form (`r||s`, 64 bytes), base64 ([ADR 0214](https://github.com/Kazo-ca/HackerOs/blob/main/doc/en/wasm/dev/adr/0214-hack-store-hot-add-signing-transactions.md)
+  of HackerOs, §2). `publish.yml` signs each new version with the `HACK_STORE_SIGNING_KEY` secret
+  when it exists; without it, versions are published unsigned. A version already published keeps
+  its signature.
+
+### Signing key (for Benoit)
+
+1. On your computer, in a copy of this repository:
+   `dotnet run --project tools/HackerOs.MarketPlace.Tool -- keygen --private-key ~/hack-store-signing.pem`.
+   The tool writes the private key to a new file (`0600`), never replaces an existing file, and
+   prints the public key.
+2. Copy the content of the `.pem` file into the repository's `HACK_STORE_SIGNING_KEY` secret
+   (Settings ▸ Secrets and variables ▸ Actions), then keep the file offline. The private key never
+   goes through an agent or a PR.
+3. Put the public key in `OfficialCatalogSigningKey` (`AppPackageDefaults.cs`) or in HackerOs's
+   `HackerOsAppSigningKeys` MSBuild property (`catalog:official=<public key>`): from that OS
+   version on, every package of the official catalog must carry a valid signature.
+4. Publish the existing versions again (*Publish catalog* workflow ▸ Run workflow, with their
+   folders) so they get a signature before the OS requires it.
 
 ## The catalog tool
 
@@ -171,6 +192,8 @@ hand with the folder names separated by spaces.
 dotnet run --project tools/HackerOs.MarketPlace.Tool -- validate --root . [folder...]
 dotnet run --project tools/HackerOs.MarketPlace.Tool -- check-package --root . --folder <folder> --report <f.md> [--package <f.hackapp>] [--sarif <dir>]
 dotnet run --project tools/HackerOs.MarketPlace.Tool -- publish --root . --built <dir> --output <packages copy> [--keep 3] [--published-at <ISO 8601>]
+dotnet run --project tools/HackerOs.MarketPlace.Tool -- keygen --private-key <file.pem>
+dotnet run --project tools/HackerOs.MarketPlace.Tool -- sign --package <f.hackapp> [--private-key <file.pem>]
 dotnet test tools/HackerOs.MarketPlace.slnx
 ```
 

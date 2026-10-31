@@ -20,8 +20,13 @@ public static class CatalogPublisher
     /// <param name="keptVersions">Versions of each app kept downloadable.</param>
     /// <param name="publishedAt">Publication time written for the new versions.</param>
     /// <param name="errors">Receives every problem found.</param>
+    /// <param name="signingKeyPem">
+    /// Private key (PKCS#8 PEM) that signs each new package (<see cref="PackageSigner"/>), or
+    /// <see langword="null"/> to publish unsigned packages. Versions already published keep their signature.
+    /// </param>
     /// <returns>The names of the folders published.</returns>
-    public static IReadOnlyList<string> Publish(string catalogRoot, string builtRoot, string outputRoot, int keptVersions, DateTimeOffset publishedAt, List<CatalogError> errors)
+    public static IReadOnlyList<string> Publish(
+        string catalogRoot, string builtRoot, string outputRoot, int keptVersions, DateTimeOffset publishedAt, List<CatalogError> errors, string? signingKeyPem = null)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(keptVersions, 1);
         CategoryList categories = CategoryList.Load(Path.Combine(catalogRoot, CatalogPaths.CategoriesFile), CatalogPaths.CategoriesFile, errors);
@@ -46,7 +51,10 @@ public static class CatalogPublisher
         Dictionary<string, CatalogApp> apps = document.Apps.ToDictionary(app => app.AppId, StringComparer.Ordinal);
         foreach ((AppFolder folder, byte[] bytes, AppPackage _) in ready)
         {
-            CatalogVersion version = CopyFiles(folder, bytes, outputRoot, publishedAt);
+            CatalogVersion version = CopyFiles(folder, bytes, outputRoot, publishedAt) with
+            {
+                Signature = signingKeyPem is null ? null : PackageSigner.Sign(bytes, signingKeyPem),
+            };
             apps[folder.AppId] = Merge(apps.GetValueOrDefault(folder.AppId), folder, version);
         }
 
