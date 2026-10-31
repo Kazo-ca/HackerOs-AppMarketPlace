@@ -1,0 +1,108 @@
+# Builds one catalog folder from the commit its store.json names (ADR 0188 §5 steps 3-4, §6).
+# Runs code from the app's repository: call it only from a job with a read-only token and no
+# secrets. Every value that comes from the PR reaches the shell through env, never through ${{ }}.
+name: Build app from its commit
+description: Fetches the app repository at the store.json commit and runs HackerOsPack, optionally under CodeQL.
+
+inputs:
+  folder:
+    description: Name of the folder under apps/ (already checked by the catalog tool).
+    required: true
+  output:
+    description: Directory that receives the .hackapp package.
+    required: true
+  codeql:
+    description: "'true' to analyze the app with CodeQL (results written as SARIF, not uploaded)."
+    required: false
+    default: 'false'
+  sarif:
+    description: Directory that receives the SARIF files when codeql is 'true'.
+    required: false
+    default: ''
+
+outputs:
+  built:
+    description: "'true' when the build produced a package."
+    value: ${{ steps.build.outputs.built }}
+
+runs:
+  using: composite
+  steps:
+    - name: Read store.json
+      id: store
+      shell: bash
+      env:
+        FOLDER: ${{ inputs.folder }}
+      run: |
+        store="apps/$FOLDER/store.json"
+        {
+          echo "repository=$(jq -r '.repository' "$store")"
+          echo "commit=$(jq -r '.commit' "$store")"
+          echo "project=$(jq -r '.project // ""' "$store")"
+        } >> "$GITHUB_OUTPUT"
+
+    - name: Fetch the app at its commit
+      shell: bash
+      env:
+        REPOSITORY: ${{ steps.store.outputs.repository }}
+        COMMIT: ${{ steps.store.outputs.commit }}
+      run: |
+        # Step 3 of the checks: the commit must exist in the repository store.json names.
+        git init --quiet "$RUNNER_TEMP/app-src"
+        cd "$RUNNER_TEMP/app-src"
+        if ! git fetch --quiet --depth 1 "$REPOSITORY" "$COMMIT"; then
+          echo "::error::Commit $COMMIT was not found in $REPOSITORY."
+          exit 1
+        fi
+        git checkout --quiet FETCH_HEAD
+
+    - name: Set up .NET
+      uses: actions/setup-dotnet@v5
+      with:
+        dotnet-version: 10.0.x
+
+    - name: Find the languages to analyze
+      id: languages
+      if: inputs.codeql == 'true'
+      shell: bash
+      run: |
+        languages=csharp
+        if [ -n "$(find "$RUNNER_TEMP/app-src" -type f \( -name '*.js' -o -name '*.mjs' -o -name '*.ts' \) -not -path '*/.git/*' -print -quit)" ]; then
+          languages=csharp,javascript-typescript
+        fi
+        echo "languages=$languages" >> "$GITHUB_OUTPUT"
+
+    - name: Start CodeQL
+      if: inputs.codeql == 'true'
+      uses: github/codeql-action/init@v4
+      with:
+        languages: ${{ steps.languages.outputs.languages }}
+        build-mode: manual
+        source-root: ${{ runner.temp }}/app-src
+
+    - name: Build with HackerOsPack
+      id: build
+      shell: bash
+      working-directory: ${{ runner.temp }}/app-src
+      env:
+        PROJECT: ${{ steps.store.outputs.project }}
+        OUTPUT: ${{ inputs.output }}
+      run: |
+        # Release builds take the HackerOS SDK from NuGet (ADR 0176): no submodule is fetched.
+        mkdir -p "$OUTPUT"
+        if dotnet build ${PROJECT:+"$PROJECT"} -c Release -t:HackerOsPack -p:HackerOsPackageOutput="$OUTPUT" -nologo; then
+          if [ -n "$(find "$OUTPUT" -name '*.hackapp' -print -quit)" ]; then
+            echo "built=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "::error::The build succeeded but produced no .hackapp package."
+        fi
+        echo "built=false" >> "$GITHUB_OUTPUT"
+
+    - name: Analyze with CodeQL
+      if: inputs.codeql == 'true' && steps.build.outputs.built == 'true'
+      uses: github/codeql-action/analyze@v4
+      with:
+        upload: never
+        output: ${{ inputs.sarif }}
+        checkout_path: ${{ runner.temp }}/app-src

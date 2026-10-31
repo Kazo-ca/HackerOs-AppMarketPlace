@@ -1,0 +1,62 @@
+# Posts the review comment written by validate.yml (ADR 0188 §5 step 7). It runs from main with a
+# token that may write comments, and treats the artifact as data: the PR number must name an open
+# PR whose head is the commit the validation ran on.
+name: Post review comment
+
+on:
+  workflow_run:
+    workflows: [Validate app submissions]
+    types: [completed]
+
+permissions:
+  actions: read
+  pull-requests: write
+
+jobs:
+  comment:
+    if: github.event.workflow_run.event == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      # No artifact when the run stopped before the review job (format errors are annotations then).
+      - uses: actions/download-artifact@v7
+        id: download
+        continue-on-error: true
+        with:
+          name: pr-comment
+          path: comment
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+
+      - uses: actions/github-script@v8
+        if: steps.download.outcome == 'success'
+        env:
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- hackeros-catalog-review -->';
+            const number = Number(fs.readFileSync('comment/pr-number', 'utf8').trim());
+            if (!Number.isInteger(number) || number <= 0) {
+              core.setFailed('The artifact does not hold a PR number.');
+              return;
+            }
+            const { data: pr } = await github.rest.pulls.get({ ...context.repo, pull_number: number });
+            if (pr.state !== 'open' || pr.head.sha !== process.env.HEAD_SHA) {
+              core.setFailed(`PR #${number} is not the PR this validation ran on.`);
+              return;
+            }
+            let body = fs.readFileSync('comment/comment.md', 'utf8');
+            if (!body.startsWith(marker)) {
+              body = `${marker}\n${body}`;
+            }
+            // GitHub refuses comments over 65536 characters.
+            if (body.length > 65000) {
+              body = body.slice(0, 65000) + '\n\n… cut: see the summary of the validation run.';
+            }
+            const comments = await github.paginate(github.rest.issues.listComments, { ...context.repo, issue_number: number });
+            const previous = comments.find(c => c.user.type === 'Bot' && c.body.startsWith(marker));
+            if (previous) {
+              await github.rest.issues.updateComment({ ...context.repo, comment_id: previous.id, body });
+            } else {
+              await github.rest.issues.createComment({ ...context.repo, issue_number: number, body });
+            }

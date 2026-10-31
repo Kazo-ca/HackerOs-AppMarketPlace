@@ -1,0 +1,13 @@
+[
+  { "id": "productivity", "labels": { "en": "Productivity", "fr": "Productivité" } },
+  { "id": "utilities", "labels": { "en": "Utilities", "fr": "Utilitaires" } },
+  { "id": "developer", "labels": { "en": "Developer tools", "fr": "Outils de développement" } },
+  { "id": "internet", "labels": { "en": "Internet", "fr": "Internet" } },
+  { "id": "communication", "labels": { "en": "Communication", "fr": "Communication" } },
+  { "id": "multimedia", "labels": { "en": "Music and video", "fr": "Musique et vidéo" } },
+  { "id": "graphics", "labels": { "en": "Graphics", "fr": "Graphisme" } },
+  { "id": "education", "labels": { "en": "Education", "fr": "Éducation" } },
+  { "id": "entertainment", "labels": { "en": "Entertainment", "fr": "Divertissement" } },
+  { "id": "emulation", "labels": { "en": "Emulation", "fr": "Émulation" } },
+  { "id": "system", "labels": { "en": "System", "fr": "Système" } }
+]

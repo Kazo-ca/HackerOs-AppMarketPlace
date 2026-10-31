@@ -1,0 +1,139 @@
+# Publishes after a merge (ADR 0188 §6): rebuilds each new version at its commit, then rewrites the
+# packages branch (catalog.json, packages/, assets/), keeping the 3 newest versions of each app.
+# The build jobs run the app's code with a read-only token; only the last job may push.
+name: Publish catalog
+
+on:
+  push:
+    branches: [main]
+    paths: ['apps/**', 'categories.json']
+  workflow_dispatch:
+    inputs:
+      folders:
+        description: Folders under apps/ to (re)publish, separated by spaces.
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-catalog
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    name: Find the versions to publish
+    runs-on: ubuntu-latest
+    outputs:
+      folders: ${{ steps.folders.outputs.folders }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          submodules: true
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+      - name: List folders
+        id: folders
+        env:
+          INPUT_FOLDERS: ${{ inputs.folders }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          if [ -n "$INPUT_FOLDERS" ]; then
+            list=$(printf '%s\n' $INPUT_FOLDERS)
+          else
+            list=$(git diff --name-only --diff-filter=A "$BEFORE" HEAD -- apps | awk -F/ 'NF >= 3 {print $2}')
+          fi
+          folders=$(printf '%s\n' "$list" | sed '/^$/d' | sort -u | jq -R . | jq -sc .)
+          echo "folders=$folders" >> "$GITHUB_OUTPUT"
+          echo "Folders to publish: $folders"
+      - name: Check them
+        if: steps.folders.outputs.folders != '[]'
+        env:
+          FOLDERS: ${{ steps.folders.outputs.folders }}
+        run: dotnet run --project tools/HackerOs.MarketPlace.Tool -c Release -- validate --root . $(jq -r '.[]' <<< "$FOLDERS")
+
+  build:
+    name: Build ${{ matrix.folder }}
+    needs: plan
+    if: needs.plan.outputs.folders != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        folder: ${{ fromJson(needs.plan.outputs.folders) }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Build
+        id: build
+        uses: ./.github/actions/build-app
+        with:
+          folder: ${{ matrix.folder }}
+          output: ${{ runner.temp }}/built/${{ matrix.folder }}
+      - name: Stop when the build failed
+        if: steps.build.outputs.built != 'true'
+        run: exit 1
+      - uses: actions/upload-artifact@v6
+        with:
+          name: built-${{ matrix.folder }}
+          path: ${{ runner.temp }}/built/${{ matrix.folder }}
+          retention-days: 7
+
+  publish:
+    name: Update the packages branch
+    needs: [plan, build]
+    # A change of categories.json alone has nothing to build but still rewrites catalog.json.
+    if: always() && needs.plan.result == 'success' && (needs.build.result == 'success' || needs.build.result == 'skipped')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+      - uses: actions/download-artifact@v7
+        # Nothing to download when only categories.json changed.
+        continue-on-error: true
+        with:
+          pattern: built-*
+          path: ${{ runner.temp }}/artifacts
+
+      - name: Check out the packages branch
+        run: |
+          if git ls-remote --exit-code --heads origin packages > /dev/null; then
+            git fetch --depth 1 origin packages
+            git worktree add packages-branch FETCH_HEAD
+          else
+            # First publication: an orphan branch with no code history.
+            git worktree add --orphan -b packages packages-branch
+          fi
+
+      - name: Publish
+        env:
+          ARTIFACTS: ${{ runner.temp }}/artifacts
+        run: |
+          # download-artifact names each folder built-<folder>; the tool wants <folder>.
+          mkdir -p "$RUNNER_TEMP/built"
+          for artifact in "$ARTIFACTS"/built-*; do
+            [ -d "$artifact" ] || continue
+            mv "$artifact" "$RUNNER_TEMP/built/${artifact##*/built-}"
+          done
+          dotnet run --project tools/HackerOs.MarketPlace.Tool -c Release -- publish \
+            --root . --built "$RUNNER_TEMP/built" --output packages-branch
+
+      - name: Push
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+        run: |
+          cd packages-branch
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Nothing to publish."
+            exit 0
+          fi
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit --quiet -m "Publish catalog from $SOURCE_SHA"
+          git push origin HEAD:refs/heads/packages
