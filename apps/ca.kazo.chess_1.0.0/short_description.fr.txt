@@ -1,0 +1,1 @@
+Échecs à deux sur un écran ou contre Stockfish (5 niveaux), avec pendule, annulation et parties .pgn.
