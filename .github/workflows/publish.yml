@@ -77,7 +77,8 @@ jobs:
       - uses: actions/upload-artifact@v6
         with:
           name: built-${{ matrix.folder }}
-          path: ${{ runner.temp }}/built/${{ matrix.folder }}
+          # The whole built/ folder: the artifact holds <folder>/, see the download below.
+          path: ${{ runner.temp }}/built/
           retention-days: 7
 
   publish:
@@ -100,7 +101,10 @@ jobs:
         continue-on-error: true
         with:
           pattern: built-*
-          path: ${{ runner.temp }}/artifacts
+          # Each artifact holds its <folder>/; merged, they give built/<folder>/ for one app or several
+          # (without it, a single artifact is extracted straight into path).
+          merge-multiple: true
+          path: ${{ runner.temp }}/built
 
       - name: Check out the packages branch
         run: |
@@ -114,17 +118,12 @@ jobs:
 
       - name: Publish
         env:
-          ARTIFACTS: ${{ runner.temp }}/artifacts
           # ADR 0214 §2 of Kazo-ca/HackerOs: each new package is signed when the secret exists.
           # The key stays in this environment variable; it is never written to disk or printed.
           HACK_STORE_SIGNING_KEY: ${{ secrets.HACK_STORE_SIGNING_KEY }}
         run: |
-          # download-artifact names each folder built-<folder>; the tool wants <folder>.
+          # built/<folder>/ for each app built above (nothing when only categories.json changed).
           mkdir -p "$RUNNER_TEMP/built"
-          for artifact in "$ARTIFACTS"/built-*; do
-            [ -d "$artifact" ] || continue
-            mv "$artifact" "$RUNNER_TEMP/built/${artifact##*/built-}"
-          done
           dotnet run --project tools/HackerOs.MarketPlace.Tool -c Release -- publish \
             --root . --built "$RUNNER_TEMP/built" --output packages-branch
 
