@@ -55,6 +55,21 @@ runs:
           exit 1
         fi
         git checkout --quiet FETCH_HEAD
+        # An app made with the hackeros-solution template (HackerOS ADR 0207) reads its HackerOS
+        # version from the external/HackerOs submodule (build/Versions.props) and stops without it
+        # (HOSAPP0070). Only that submodule is fetched, and only from Kazo-ca/HackerOs: the app
+        # chooses the HackerOS release, not where its build code comes from.
+        if [ -f .gitmodules ]; then
+          name=$(git config -f .gitmodules --get-regexp '^submodule\..*\.path$' | awk '$2 == "external/HackerOs" {sub(/^submodule\./, "", $1); sub(/\.path$/, "", $1); print $1; exit}')
+          if [ -n "$name" ]; then
+            url=$(git config -f .gitmodules --get "submodule.$name.url")
+            case "$url" in
+              https://github.com/Kazo-ca/HackerOs|https://github.com/Kazo-ca/HackerOs.git) ;;
+              *) echo "::error file=.gitmodules::external/HackerOs must point to https://github.com/Kazo-ca/HackerOs, not $url."; exit 1 ;;
+            esac
+            git submodule update --init --depth 1 --quiet -- external/HackerOs
+          fi
+        fi
 
     - name: Set up .NET
       uses: actions/setup-dotnet@v5
@@ -88,7 +103,8 @@ runs:
         PROJECT: ${{ steps.store.outputs.project }}
         OUTPUT: ${{ inputs.output }}
       run: |
-        # Release builds take the HackerOS SDK from NuGet (ADR 0176): no submodule is fetched.
+        # Release builds take the HackerOS SDK packages from NuGet (ADR 0176), at the version of the
+        # external/HackerOs submodule fetched above.
         mkdir -p "$OUTPUT"
         if dotnet build ${PROJECT:+"$PROJECT"} -c Release -t:HackerOsPack -p:HackerOsPackageOutput="$OUTPUT" -nologo; then
           if [ -n "$(find "$OUTPUT" -name '*.hackapp' -print -quit)" ]; then

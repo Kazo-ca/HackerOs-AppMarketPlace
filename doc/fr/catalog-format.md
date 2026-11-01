@@ -32,8 +32,14 @@ L'outil `tools/HackerOs.MarketPlace.Tool` lit les manifestes avec `AppManifestJs
 `AppManifestValidator`, et les paquets avec `AppPackage.Read` : ce sont les classes de HackerOS
 elles-mêmes, donc le catalogue applique exactement les règles de l'OS à l'installation. Le lecteur
 de paquets (ADR 0182) n'est pas encore dans les paquets NuGet 2.1.0 : l'outil compile les deux
-bibliothèques depuis le sous-module `external/HackerOs`, fixé sur un commit de `main`. Quand une
-version publiée les contiendra, le sous-module sera remplacé par des `PackageReference`.
+bibliothèques depuis le sous-module `external/HackerOs`, sur le tag `v2.2.1` (2026-11-01 : le
+lecteur de paquets de cette version accepte les assemblages satellites, ADR 0222 de HackerOS).
+Quand une version publiée les contiendra, le sous-module sera remplacé par des `PackageReference`.
+
+La CI compile une app soumise à son commit avec le sous-module `external/HackerOs` de l'app (une
+app créée avec le modèle `hackeros-solution` y lit sa version de HackerOS) : l'action
+`build-app` récupère ce seul sous-module, et seulement s'il pointe vers
+`https://github.com/Kazo-ca/HackerOs`.
 
 ## Le dossier d'une version
 
@@ -46,7 +52,7 @@ qui n'est pas dans ce tableau est refusé, pour qu'aucun binaire n'entre dans `m
 | `icon.png` | oui | PNG 256×256, 200 Ko au plus |
 | `short_description.<lang>.txt` | `en` oui | UTF-8, une ligne non vide, 120 caractères au plus |
 | `description.<lang>.md` | `en` oui | UTF-8, non vide, 20 Ko au plus |
-| `manifest.json` | oui | lecture stricte et validation de l'OS ; `id` et `version` égaux au nom du dossier |
+| `manifest.json` | oui | celui **du paquet** construit par `HackerOsPack` (pas celui du projet : le paquet y ajoute les ressources statiques, ADR 0221 de HackerOS) ; lecture stricte et validation de l'OS ; `id` et `version` égaux au nom du dossier |
 | `store.json` | oui | voir ci-dessous |
 | `screenshots/1.png` … `5.png` | non | 1 à 5 PNG numérotés sans trou, 1 Mo et 3840 px de côté au plus |
 

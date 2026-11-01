@@ -27,7 +27,7 @@ that package is what gets published. What reaches users is exactly the reviewed 
      short_description.fr.txt   optional, one language per file
      description.en.md          long description (English required), 20 KB at most
      description.fr.md          optional
-     manifest.json              the manifest.json your build generated, unchanged
+     manifest.json              the manifest.json of the package HackerOsPack built, unchanged
      store.json                 see below
      screenshots/1.png … 5.png  optional, 1 MB and 3840 px per side at most each
    ```
@@ -45,7 +45,14 @@ that package is what gets published. What reaches users is exactly the reviewed 
 
    `commit` is the full SHA (40 characters); `category` comes from
    [`categories.json`](categories.json); `project` is optional (without it, the repository root
-   must hold a single project or solution).
+   must hold a single project or solution). A repository made with the `hackeros-solution`
+   template holds a solution with a host and tests: name the app's `.csproj` in `project`.
+
+   `manifest.json` is the one **inside the package**, not the one of your project: `HackerOsPack`
+   adds every static resource of the app to the package's manifest (HackerOS ADR 0221), and the
+   catalog compares that manifest with the package its CI builds. Take it with
+   `unzip -p <bin>/hackeros-packages/<version>/<appId>-<version>.hackapp manifest.json`; the
+   **Publish to the Hack Store** workflow of the template does it for you.
 3. Open a pull request to `main` and fill in the template.
 4. The **Validate app submissions** workflow checks the format, builds the app at the given
    commit, compares the generated manifest with yours, runs CodeQL, then writes a comment with the

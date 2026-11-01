@@ -29,7 +29,8 @@ public sealed class PackageCheckTests : IDisposable
         List<CatalogError> errors = [];
 
         Assert.Null(PackageCheck.Check(folder, other, errors));
-        Assert.Contains(errors, error => error.Message.Contains("differs from the one in the folder", StringComparison.Ordinal));
+        Assert.Contains(errors, error => error.Message.Contains("differs from the one in the folder", StringComparison.Ordinal)
+            && error.Message.Contains("inside the package", StringComparison.Ordinal));
     }
 
     [Fact]
