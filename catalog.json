@@ -79,5 +79,55 @@
       }
     }
   ],
-  "apps": []
+  "apps": [
+    {
+      "appId": "ca.kazo.chess",
+      "kind": "app",
+      "name": "Chess",
+      "category": "entertainment",
+      "tags": [
+        "chess",
+        "board-game",
+        "stockfish",
+        "pgn"
+      ],
+      "shortDescriptions": {
+        "en": "Chess for two on one screen or against Stockfish (5 levels), with a clock, undo and saved games (.pgn).",
+        "fr": "\u00C9checs \u00E0 deux sur un \u00E9cran ou contre Stockfish (5 niveaux), avec pendule, annulation et parties .pgn."
+      },
+      "license": "GPL-3.0",
+      "repository": "https://github.com/Kazo-ca/HackerOs-App-Chess",
+      "latestVersion": "1.0.0",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "commit": "56bbb3d9958349d9c71cceb9700bf11dce63e5d6",
+          "package": "packages/ca.kazo.chess/1.0.0/ca.kazo.chess-1.0.0.hackapp",
+          "sha256": "2c44ec5646fae8389000bdf4aeab7e38e4f96d8afa5053e9325380133a748c9f",
+          "size": 1348035,
+          "publishedAt": "2026-11-01T22:19:25+00:00",
+          "capabilities": [
+            "dialogs.file-open",
+            "dialogs.file-save",
+            "filesystem.user-home.read",
+            "filesystem.user-home.write"
+          ],
+          "sdkCompatibility": {
+            "minimumVersion": "2.2.1"
+          },
+          "icon": "assets/ca.kazo.chess/1.0.0/icon.png",
+          "screenshots": [
+            "assets/ca.kazo.chess/1.0.0/screenshots/1.png",
+            "assets/ca.kazo.chess/1.0.0/screenshots/2.png",
+            "assets/ca.kazo.chess/1.0.0/screenshots/3.png"
+          ],
+          "descriptions": {
+            "en": "assets/ca.kazo.chess/1.0.0/description.en.md",
+            "fr": "assets/ca.kazo.chess/1.0.0/description.fr.md"
+          },
+          "signature": "rsbYj1ghSTaSncAHqPQKEbPv94KFmVPoGBR/YvywN5O6X42p4CD60CCiIq5Pi4KOTnE0H28qsufsQuUOF\u002Bg3nw=="
+        }
+      ]
+    }
+  ]
 }
