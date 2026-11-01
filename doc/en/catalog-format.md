@@ -32,8 +32,14 @@ The tool `tools/HackerOs.MarketPlace.Tool` reads manifests with `AppManifestJson
 `AppManifestValidator`, and packages with `AppPackage.Read`: the HackerOS classes themselves, so the
 catalog applies exactly the rules the OS applies at install time. The package reader (ADR 0182) is
 not in the 2.1.0 NuGet packages yet: the tool builds the two libraries from the
-`external/HackerOs` submodule, pinned to a commit of `main`. Once a release carries them, the
-submodule is replaced by `PackageReference` items.
+`external/HackerOs` submodule, on the `v2.2.1` tag (2026-11-01: the package reader of that version
+accepts the satellite assemblies, HackerOS ADR 0222). Once a release carries them, the submodule is
+replaced by `PackageReference` items.
+
+The CI builds a submitted app at its commit with the app's own `external/HackerOs` submodule (an
+app made with the `hackeros-solution` template reads its HackerOS version there): the
+`build-app` action fetches that one submodule, and only when it points to
+`https://github.com/Kazo-ca/HackerOs`.
 
 ## A version folder
 
@@ -46,7 +52,7 @@ refused, so no binary enters `main`.
 | `icon.png` | yes | PNG 256×256, 200 KB at most |
 | `short_description.<lang>.txt` | `en` yes | UTF-8, one non-empty line, 120 characters at most |
 | `description.<lang>.md` | `en` yes | UTF-8, not empty, 20 KB at most |
-| `manifest.json` | yes | strict read and OS validation; `id` and `version` equal to the folder name |
+| `manifest.json` | yes | the one **of the package** `HackerOsPack` built (not the project's: the package adds the static resources to it, HackerOS ADR 0221); strict read and OS validation; `id` and `version` equal to the folder name |
 | `store.json` | yes | see below |
 | `screenshots/1.png` … `5.png` | no | 1 to 5 PNG numbered without gaps, 1 MB and 3840 px per side at most |
 

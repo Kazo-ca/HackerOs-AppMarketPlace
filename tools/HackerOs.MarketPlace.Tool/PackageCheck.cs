@@ -35,7 +35,7 @@ public static class PackageCheck
         {
             errors.Add(new CatalogError(
                 $"{display}/{CatalogPaths.ManifestFile}",
-                $"The manifest generated at commit {folder.Store.Commit} differs from the one in the folder: copy the manifest.json of that build."));
+                $"The manifest generated at commit {folder.Store.Commit} differs from the one in the folder: copy the manifest.json inside the package HackerOsPack built (unzip -p <app>.hackapp manifest.json), not the project's."));
             return null;
         }
 

@@ -28,7 +28,7 @@ code relu.
      short_description.fr.txt   facultatif, une langue par fichier
      description.en.md          description longue (anglais obligatoire), 20 Ko au plus
      description.fr.md          facultatif
-     manifest.json              le manifest.json généré par votre build, sans modification
+     manifest.json              le manifest.json du paquet construit par HackerOsPack, sans modification
      store.json                 voir ci-dessous
      screenshots/1.png … 5.png  facultatif, 1 Mo et 3840 px de côté au plus chacune
    ```
@@ -46,7 +46,15 @@ code relu.
 
    `commit` est le SHA complet (40 caractères) ; `category` vient de
    [`categories.json`](categories.json) ; `project` est facultatif (sans lui, la racine du dépôt
-   doit contenir un seul projet ou une seule solution).
+   doit contenir un seul projet ou une seule solution). Un dépôt créé avec le modèle
+   `hackeros-solution` contient une solution avec un hôte et des tests : indiquez le `.csproj` de
+   l'app dans `project`.
+
+   `manifest.json` est celui **du paquet**, pas celui de votre projet : `HackerOsPack` ajoute au
+   manifeste du paquet toutes les ressources statiques de l'app (ADR 0221 de HackerOS), et le
+   catalogue compare ce manifeste au paquet que sa CI construit. Récupérez-le avec
+   `unzip -p <bin>/hackeros-packages/<version>/<appId>-<version>.hackapp manifest.json` ; le
+   workflow **Publish to the Hack Store** du modèle le fait pour vous.
 3. Ouvrez une pull request vers `main` et remplissez le modèle.
 4. L'action **Validate app submissions** vérifie le format, compile l'app au commit indiqué,
    compare le manifeste produit avec le vôtre, lance CodeQL, puis écrit un commentaire avec les
