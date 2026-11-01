@@ -81,19 +81,28 @@ runs:
       if: inputs.codeql == 'true'
       shell: bash
       run: |
+        # The app's own code only: external/HackerOs (the submodule fetched above) is HackerOS.
         languages=csharp
-        if [ -n "$(find "$RUNNER_TEMP/app-src" -type f \( -name '*.js' -o -name '*.mjs' -o -name '*.ts' \) -not -path '*/.git/*' -print -quit)" ]; then
+        mode=manual
+        if [ -n "$(find "$RUNNER_TEMP/app-src" -type f \( -name '*.js' -o -name '*.mjs' -o -name '*.ts' \) -not -path '*/.git/*' -not -path "$RUNNER_TEMP/app-src/external/*" -print -quit)" ]; then
           languages=csharp,javascript-typescript
+          # JavaScript/TypeScript only supports build-mode none, and one init sets the mode of every
+          # language: C# is then analyzed from its sources (buildless) instead of a traced build.
+          mode=none
         fi
         echo "languages=$languages" >> "$GITHUB_OUTPUT"
+        echo "mode=$mode" >> "$GITHUB_OUTPUT"
 
     - name: Start CodeQL
       if: inputs.codeql == 'true'
       uses: github/codeql-action/init@v4
       with:
         languages: ${{ steps.languages.outputs.languages }}
-        build-mode: manual
+        build-mode: ${{ steps.languages.outputs.mode }}
         source-root: ${{ runner.temp }}/app-src
+        config: |
+          paths-ignore:
+            - external/**
 
     - name: Build with HackerOsPack
       id: build
