@@ -1,0 +1,1 @@
+Chess for two on one screen or against Stockfish (5 levels), with a clock, undo and saved games (.pgn).
