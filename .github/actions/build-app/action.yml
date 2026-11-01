@@ -82,27 +82,44 @@ runs:
       shell: bash
       run: |
         # The app's own code only: external/HackerOs (the submodule fetched above) is HackerOS.
-        languages=csharp
-        mode=manual
+        javascript=false
         if [ -n "$(find "$RUNNER_TEMP/app-src" -type f \( -name '*.js' -o -name '*.mjs' -o -name '*.ts' \) -not -path '*/.git/*' -not -path "$RUNNER_TEMP/app-src/external/*" -print -quit)" ]; then
-          languages=csharp,javascript-typescript
-          # JavaScript/TypeScript only supports build-mode none, and one init sets the mode of every
-          # language: C# is then analyzed from its sources (buildless) instead of a traced build.
-          mode=none
+          javascript=true
         fi
-        echo "languages=$languages" >> "$GITHUB_OUTPUT"
-        echo "mode=$mode" >> "$GITHUB_OUTPUT"
+        echo "javascript=$javascript" >> "$GITHUB_OUTPUT"
+
+    # JavaScript/TypeScript can only be analyzed with build-mode none, which the CodeQL action runs in
+    # the job's directory (this catalog), not in source-root: the app's JavaScript is analyzed here
+    # with the CodeQL CLI of the runner, on the app's sources, before the C# build is traced.
+    - name: Analyze the JavaScript with CodeQL
+      if: inputs.codeql == 'true' && steps.languages.outputs.javascript == 'true'
+      shell: bash
+      env:
+        SOURCE: ${{ runner.temp }}/app-src
+        SARIF: ${{ inputs.sarif }}
+      run: |
+        codeql=$(find /opt/hostedtoolcache/CodeQL -mindepth 4 -maxdepth 4 -path '*/x64/codeql/codeql' -type f 2>/dev/null | sort -V | tail -n 1)
+        if [ -z "$codeql" ]; then
+          echo "::error::No CodeQL bundle on this runner: the app's JavaScript is not analyzed."
+          exit 1
+        fi
+        config="$RUNNER_TEMP/codeql-javascript.yml"
+        printf 'paths-ignore:\n  - external/**\n' > "$config"
+        "$codeql" database create "$RUNNER_TEMP/codeql-javascript" --language=javascript --build-mode=none \
+          --source-root "$SOURCE" --codescanning-config "$config" --overwrite
+        mkdir -p "$SARIF"
+        "$codeql" database analyze "$RUNNER_TEMP/codeql-javascript" \
+          codeql/javascript-queries:codeql-suites/javascript-code-scanning.qls \
+          --format=sarif-latest --output "$SARIF/javascript.sarif"
 
     - name: Start CodeQL
       if: inputs.codeql == 'true'
       uses: github/codeql-action/init@v4
       with:
-        languages: ${{ steps.languages.outputs.languages }}
-        build-mode: ${{ steps.languages.outputs.mode }}
+        languages: csharp
+        # The C# of the app is analyzed from its build, traced in the next step.
+        build-mode: manual
         source-root: ${{ runner.temp }}/app-src
-        config: |
-          paths-ignore:
-            - external/**
 
     - name: Build with HackerOsPack
       id: build
