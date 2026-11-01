@@ -90,7 +90,7 @@ Les numéros sont ceux de l'ADR 0188 §5.
 | 3 | job *Build* | `git fetch` du commit dans le dépôt de `store.json` ; échec s'il n'existe pas |
 | 4 | job *Build* puis *review* | `dotnet build -c Release -t:HackerOsPack`, puis `check-package` : le paquet doit être lu par `AppPackage.Read` et son manifeste être celui du dossier |
 | 5 | — | vérification des API contre le runtime élagué : faite par `hackpkg` à l'installation (ADR 0182) ; pas en CI pour la v1 (décision de Benoit, Q1 = A ; [#3](https://github.com/Kazo-ca/HackerOs-AppMarketPlace/issues/3)) |
-| 6 | job *Build* | CodeQL (`csharp`, plus `javascript-typescript` si le dépôt a des fichiers JS ou TS hors de `external/`) ; C# seul est analysé depuis sa build tracée (`manual`), avec du JavaScript les deux sont analysés depuis leurs sources (`none`, le seul mode que JavaScript accepte) ; `external/**` (le sous-module HackerOS) est ignoré ; les résultats sont résumés dans le commentaire |
+| 6 | job *Build* | CodeQL sur le code de l'app : C# depuis sa build tracée (`manual`) ; JavaScript/TypeScript, si le dépôt en a hors de `external/`, depuis ses sources avec la CLI CodeQL du runner (`none`, le seul mode que JavaScript accepte, que l'action CodeQL lancerait sur le dossier du catalogue lui-même) ; `external/**` (le sous-module HackerOS) est ignoré ; les résultats sont résumés dans le commentaire |
 | 7 | *review* puis `pr-comment.yml` | commentaire : source, licence, SDK, taille et SHA-256 du paquet, capacités (les dangereuses d'abord, marquées ⚠️), fichiers JavaScript, assemblies, résultats CodeQL |
 
 Puis un mainteneur relit le code et approuve ; rien n'est fusionné automatiquement.
