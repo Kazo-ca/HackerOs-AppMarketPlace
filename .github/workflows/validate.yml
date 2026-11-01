@@ -77,7 +77,9 @@ jobs:
         if: always()
         with:
           name: build-${{ matrix.folder }}
-          path: ${{ runner.temp }}/review/${{ matrix.folder }}
+          # The whole review/ folder: the artifact holds <folder>/package and <folder>/sarif, so the
+          # review job finds review/<folder>/ whether one app or several were built.
+          path: ${{ runner.temp }}/review/
           if-no-files-found: ignore
           retention-days: 7
 
@@ -97,6 +99,9 @@ jobs:
       - uses: actions/download-artifact@v7
         with:
           pattern: build-*
+          # Without it, a single artifact is extracted straight into path (not into build-<folder>/):
+          # each artifact already holds its <folder>/, so merging them gives review/<folder>/ always.
+          merge-multiple: true
           path: ${{ runner.temp }}/review
 
       - name: Check each package against its folder
@@ -118,9 +123,9 @@ jobs:
           } > comment/comment.md
           status=0
           for folder in $(jq -r '.[]' <<< "$FOLDERS"); do
-            package=$(find "$REVIEW/build-$folder/package" -name '*.hackapp' -print -quit 2>/dev/null || true)
+            package=$(find "$REVIEW/$folder/package" -name '*.hackapp' -print -quit 2>/dev/null || true)
             "${tool[@]}" check-package --root . --folder "$folder" --report "comment/$folder.md" \
-              ${package:+--package "$package"} --sarif "$REVIEW/build-$folder/sarif" || status=1
+              ${package:+--package "$package"} --sarif "$REVIEW/$folder/sarif" || status=1
             cat "comment/$folder.md" >> comment/comment.md
           done
           cat comment/comment.md >> "$GITHUB_STEP_SUMMARY"
